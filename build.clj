@@ -1,6 +1,8 @@
 (ns build
   (:refer-clojure :exclude [test])
   (:require
+   [clojure.string :as str]
+   [clojure.java.io :as io]
    [clojure.tools.build.api :as b]))
 
 (def lib 'net.clojars.skipper/skipper)
@@ -26,7 +28,7 @@
          :lib lib
          :main main
          :uber-file (format "target/%s-%s.jar" lib version)
-         :basis (b/create-basis {})
+         :basis (b/create-basis (:basis-opts opts))
          :class-dir class-dir
          :src-dirs ["src"]
          :ns-compile [main]))
@@ -50,3 +52,28 @@
   (test opts)
   (uber opts)
   opts)
+
+(defn native
+  "Build the native binary"
+  [opts]
+  (let [opts (assoc opts :basis-opts {:aliases [:native]})]
+    (uber opts)
+    (println "Building native binary...")
+    (if-let [graalvm-home (System/getenv "GRAALVM_HOME")]
+      (let [jar (:uber-file (uber-opts opts))
+            binary (str/replace jar #"\.jar$" "")
+            command [(str (io/file graalvm-home "bin" "native-image"))
+                     "-jar" jar
+                     "-o" binary
+                     "-H:+ReportExceptionStackTraces"
+                     "-J-Dclojure.compiler.direct-linking=true"
+                     "-J-Dclojure.spec.skip-macros=true"
+                     "--features=clj_easy.graal_build_time.InitClojureClasses"
+                     "--no-fallback"
+                     "--static"
+                     "--libc=musl"
+                     "--native-image-info"
+                     "--verbose"]]
+        (b/process {:command-args command}))
+      (throw (ex-info "Environment variable GRAALVM_HOME is not set" {})))
+    opts))
