@@ -1,1 +1,3 @@
 # skipper
+
+Make deployments simple
