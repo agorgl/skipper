@@ -1,10 +1,7 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}}
  :aliases
- {:run-m {:main-opts ["-m" "skipper.core"]}
-  :run-x {:ns-default skipper.core
-          :exec-fn greet
-          :exec-args {:name "Clojure"}}
+ {:run {:main-opts ["-m" "skipper.core"]}
   :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
           :ns-default build}
   :test {:extra-paths ["test"]
