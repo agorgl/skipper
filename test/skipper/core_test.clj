@@ -1,6 +1,7 @@
 (ns skipper.core-test
-  (:require [clojure.test :refer :all]
-            [skipper.core :refer :all]))
+  (:require
+   [clojure.test :refer :all]
+   [skipper.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."
