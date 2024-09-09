@@ -1,0 +1,10 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "\\Qconfig.edn\\E"
+      }
+    ]
+  },
+  "bundles": []
+}
