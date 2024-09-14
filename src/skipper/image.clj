@@ -41,3 +41,8 @@
         {:keys [exit]} (process/exec command {:dir dir :printer process/std-printer})]
     (when (zero? exit)
       image)))
+
+(defn delete [app]
+  (let [image (str app ":latest")
+        command ["podman" "image" "rm" "-i" image]]
+    (process/exec command)))
