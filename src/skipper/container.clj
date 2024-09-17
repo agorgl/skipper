@@ -1,8 +1,10 @@
 (ns skipper.container
   (:require
+   [clojure.string :as str]
    [clojure.java.io :as io]
    [clj-yaml.core :as yaml]
-   [skipper.config :as config]))
+   [skipper.config :as config]
+   [skipper.process :as process]))
 
 (def label "skipper")
 
@@ -53,3 +55,46 @@
 (defn pod-manifest-delete [app]
   (let [file (pod-manifest app)]
     (io/delete-file file true)))
+
+(defn pod-exists [app]
+  (let [command ["podman" "pod" "exists" app]
+        {:keys [exit]} (process/exec command {:throw? false})]
+    (zero? exit)))
+
+(defn pod-running [app]
+  (when (pod-exists app)
+    (let [command ["podman" "pod" "inspect" "-f" "{{.State}}" app]
+          {:keys [out]} (process/exec command)]
+      (= (-> out (str/trim-newline) (str/lower-case)) "running"))))
+
+(defn pod-create [app & [opts]]
+  (let [opts (or opts {:image (str app ":latest")})
+        yaml (pod-yaml app opts)
+        file (pod-manifest-create app yaml)
+        command ["podman" "kube" "play" "-q" "--start=false" file]]
+    (process/exec command)))
+
+(defn pod-start [app]
+  (when-not (pod-running app)
+    (let [command ["podman" "pod" "start" app]]
+      (process/exec command))))
+
+(defn pod-logs [app]
+  (let [command ["podman" "pod" "logs" app]]
+    (process/exec command {:printer process/std-printer})))
+
+(defn pod-list []
+  (let [command ["podman" "pod" "ps" "-n" "--filter" (str "label=" label) "--format" "{{.Name}}"]
+        {:keys [out]} (process/exec command)]
+    (-> out
+        str/split-lines)))
+
+(defn pod-stop [app]
+  (when (pod-running app)
+    (let [command ["podman" "pod" "stop" app]]
+      (process/exec command))))
+
+(defn pod-delete [app]
+  (let [command ["podman" "pod" "rm" app]]
+    (process/exec command))
+  (pod-manifest-delete app))
