@@ -9,7 +9,8 @@
    :desc "Manage farm barns and animals"
    :opts [{:name "farm"
            :desc "Farm to manage"
-           :alias "f"}
+           :alias "f"
+           :type :string}
           {:name "version"
            :desc "Show program version"
            :alias "v"}
@@ -30,7 +31,8 @@
            :desc "Manage animals"
            :opts [{:name "barn"
                    :desc "Barn to manage"
-                   :alias "b"}]
+                   :alias "b"
+                   :type :string}]
            :cmds [{:name "add"
                    :desc "Add animal"
                    :args [{:name "name"}]}
@@ -145,3 +147,94 @@
               "  -v, --version   Show program version"
               "  -h, --help      Show help summary"]
              (-> (with-out-str (help ["farmctl" "barn"])) (str/split-lines)))))))
+
+(deftest test-parse-error
+  (testing "with unknown option"
+    (is (= [:unknown-option "-g"]
+           (parse-error "Unknown option: \"-g\""))))
+  (testing "with missing required"
+    (is (= [:missing-required ["-f" "FARM"]]
+           (parse-error "Missing required argument for \"-f FARM\""))))
+  (testing "with parsing error"
+    (is (= [:parsing-error ["-f" "foo"] "java.lang.NumberFormatException: For input string: \"foo\""]
+           (parse-error "Error while parsing option \"-f foo\": java.lang.NumberFormatException: For input string: \"foo\""))))
+  (testing "with validation error"
+    (is (= [:validation-error ["-f" "0"] nil]
+           (parse-error "Failed to validate \"-f 0\"")))
+    (is (= [:validation-error ["-f" "0"] "Value must be positive"]
+           (parse-error "Failed to validate \"-f 0\": Value must be positive")))))
+
+(deftest test-parse-args
+  (testing "valid options"
+    (is (= {:command ["farmctl"],
+            :options {:help true},
+            :arguments {},
+            :errors [[:missing-command]]}
+           (parse-args spec ["farmctl" "-h"])))
+    (is (= {:command ["farmctl"],
+            :options {:help true},
+            :arguments {},
+            :errors [[:missing-command]]}
+           (parse-args spec ["farmctl" "--help"]))))
+  (testing "valid command"
+    (is (= {:command ["farmctl" "barn" "ls"],
+            :options {},
+            :arguments {},
+            :errors []}
+           (parse-args spec ["farmctl" "barn" "ls"]))))
+  (testing "valid command with valid options"
+    (is (= {:command ["farmctl" "animal" "ls"],
+            :options {:help true},
+            :arguments {},
+            :errors []}
+           (parse-args spec ["farmctl" "animal" "ls" "-h"])))
+    (is (= {:command ["farmctl" "animal" "ls"],
+            :options {:barn "foo"},
+            :arguments {},
+            :errors []}
+           (parse-args spec ["farmctl" "animal" "ls" "-b" "foo"]))))
+  (testing "valid command with valid arguments"
+    (is (= {:command ["farmctl" "barn" "add"],
+            :options {},
+            :arguments {:name "foo"},
+            :errors []}
+           (parse-args spec ["farmctl" "barn" "add" "foo"]))))
+  (testing "valid command with valid options and arguments"
+    (is (= {:command ["farmctl" "animal" "add"],
+            :options {:barn "foo"},
+            :arguments {:name "moo"},
+            :errors []}
+           (parse-args spec ["farmctl" "animal" "add" "-b" "foo" "moo"]))))
+  (testing "unrecognized command"
+    (is (= {:command ["farmctl" "foo"],
+            :options {},
+            :arguments {},
+            :errors [[:unrecognized-command]]}
+           (parse-args spec ["farmctl" "foo"])))
+    (is (= {:command ["farmctl" "barn" "foo"],
+            :options {},
+            :arguments {},
+            :errors [[:unrecognized-command]]}
+           (parse-args spec ["farmctl" "barn" "foo"]))))
+  (testing "missing command"
+    (is (= {:command ["farmctl"],
+            :options {},
+            :arguments {},
+            :errors [[:missing-command]]}
+           (parse-args spec ["farmctl"])))
+    (is (= {:command ["farmctl" "barn"],
+            :options {},
+            :arguments {},
+            :errors [[:missing-command]]}
+           (parse-args spec ["farmctl" "barn"]))))
+  (testing "unknown option"
+    (is (= {:command ["farmctl"],
+            :options {},
+            :arguments {},
+            :errors [[:unknown-option "-g"] [:missing-command]]}
+           (parse-args spec ["farmctl" "-g"])))
+    (is (= {:command ["farmctl" "barn" "ls"],
+            :options {},
+            :arguments {},
+            :errors [[:unknown-option "-g"]]}
+           (parse-args spec ["farmctl" "barn" "ls" "-g"])))))

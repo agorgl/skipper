@@ -1,6 +1,7 @@
 (ns skipper.cli
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.tools.cli :as cli]))
 
 (def spec
   {:name "skipper"
@@ -26,6 +27,9 @@
                    :args [{:name "app"}]}
                   {:name "logs"
                    :desc "Fetch logs for running app instance"
+                   :opts [{:name "follow"
+                           :desc "Follow log output"
+                           :alias "f"}]
                    :args [{:name "app"}]}
                   {:name "delete"
                    :desc "Remove an app"
@@ -107,3 +111,56 @@
    (help [(:name spec)]))
   ([cmd]
    (println (summary spec cmd))))
+
+(defn opt-spec
+  "Maps an option spec to a tools.cli option spec."
+  [{:keys [name desc alias type]}]
+  (merge
+   {:id (keyword name)
+    :desc desc
+    :long-opt (str "--" name)}
+   (when alias
+     {:short-opt (str "-" alias)})
+   (when (and type (not= type :boolean))
+     (let [refn (-> name (str/replace "-" "_") (str/upper-case))]
+       {:required refn}))))
+
+(defn parse-error
+  "Parses a tools.cli error string to an error vector."
+  [s]
+  (or
+   (when-let [[[_ opt]] (re-seq #"Unknown option: \"([^\"]*)\"" s)]
+     [:unknown-option opt])
+   (when-let [[[_ opt]] (re-seq #"Missing required argument for \"([^\"]*)\"" s)]
+     [:missing-required (str/split opt #"\s" 2)])
+   (when-let [[[_ opt msg]] (re-seq #"Error while parsing option \"([^\"]*)\": (.*)" s)]
+     [:parsing-error (str/split opt #"\s" 2) msg])
+   (when-let [[[_ opt _ msg]] (re-seq #"Failed to validate \"([^\"]*)\"(: (.*))?" s)]
+     [:validation-error (str/split opt #"\s" 2) msg])
+   [:unclassified-error s]))
+
+(defn parse-args
+  "Parses an argument vector according to a cli spec."
+  [spec args]
+  (loop [result {:command [(first args)]
+                 :options {}
+                 :arguments {}
+                 :errors []}
+         args (rest args)]
+    (let [spec (cmd-spec spec (:command result))]
+      (if-not spec
+        (update result :errors conj [:unrecognized-command])
+        (let [opt-specs (->> (:opts spec) (mapv opt-spec))
+              parse-result (cli/parse-opts args opt-specs :in-order true :strict true)
+              args      (->> parse-result :arguments)
+              options   (->> parse-result :options)
+              errors    (->> parse-result :errors (mapv parse-error))
+              result (merge-with into result {:options options :errors errors})]
+          (if-not (:cmds spec)
+            (if-not (<= (count (remove :optional (:args spec))) (count args) (count (:args spec)))
+              (update result :errors conj [:incorrect-arguments])
+              (assoc result :arguments (zipmap (map #(-> % :name keyword) (:args spec)) args)))
+            (if (empty? args)
+              (update result :errors conj [:missing-command])
+              (recur (update result :command conj (first args))
+                     (rest args)))))))))
