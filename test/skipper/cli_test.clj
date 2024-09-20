@@ -50,16 +50,21 @@
 (deftest test-cmd-spec
   (testing "command exists"
     (is (= spec (cmd-spec spec ["farmctl"])))
-    (is (= (-> spec :cmds first) (cmd-spec spec ["farmctl" "barn"])))
-    (is (= (-> spec :cmds first :cmds second) (cmd-spec spec ["farmctl" "barn" "ls"]))))
+    (is (= (-> (get-in spec [:cmds 0])
+               (update :opts #(into (or % []) (get-in spec [:opts]))))
+           (cmd-spec spec ["farmctl" "barn"])))
+    (is (= (-> (get-in spec [:cmds 0 :cmds 1])
+               (update :opts #(into (or % []) (get-in spec [:cmds 0 :opts])))
+               (update :opts #(into (or % []) (get-in spec [:opts]))))
+           (cmd-spec spec ["farmctl" "barn" "ls"]))))
   (testing "command doesn't exist"
     (is (= nil (cmd-spec spec ["farmctl" "foo"])))))
 
 (deftest test-usage
   (testing "command exists"
     (is (= "farmctl [options] [command]" (usage spec ["farmctl"])))
-    (is (= "farmctl barn [command]" (usage spec ["farmctl" "barn"])))
-    (is (= "farmctl barn ls" (usage spec ["farmctl" "barn" "ls"]))))
+    (is (= "farmctl barn [options] [command]" (usage spec ["farmctl" "barn"])))
+    (is (= "farmctl barn ls [options]" (usage spec ["farmctl" "barn" "ls"]))))
   (testing "command doesn't exist"
     (is (= nil (usage spec ["farmctl" "foo"])))))
 
@@ -82,17 +87,27 @@
     (is (= ["Manage barns"
             ""
             "Usage:"
-            "  farmctl barn [command]"
+            "  farmctl barn [options] [command]"
             ""
             "Commands:"
             "  add      Add barn"
             "  ls       List barns"
-            "  rm       Remove barn"]
+            "  rm       Remove barn"
+            ""
+            "Options:"
+            "  -f, --farm      Farm to manage"
+            "  -v, --version   Show program version"
+            "  -h, --help      Show help summary"]
            (-> (summary spec ["farmctl" "barn"]) (str/split-lines))))
     (is (= ["List barns"
             ""
             "Usage:"
-            "  farmctl barn ls"]
+            "  farmctl barn ls [options]"
+            ""
+            "Options:"
+            "  -f, --farm      Farm to manage"
+            "  -v, --version   Show program version"
+            "  -h, --help      Show help summary"]
            (-> (summary spec ["farmctl" "barn" "ls"]) (str/split-lines)))))
   (testing "command doesn't exist"
     (is (= nil (summary spec ["farmctl" "foo"])))))
@@ -118,10 +133,15 @@
       (is (= ["Manage barns"
               ""
               "Usage:"
-              "  farmctl barn [command]"
+              "  farmctl barn [options] [command]"
               ""
               "Commands:"
               "  add      Add barn"
               "  ls       List barns"
-              "  rm       Remove barn"]
+              "  rm       Remove barn"
+              ""
+              "Options:"
+              "  -f, --farm      Farm to manage"
+              "  -v, --version   Show program version"
+              "  -h, --help      Show help summary"]
              (-> (with-out-str (help ["farmctl" "barn"])) (str/split-lines)))))))

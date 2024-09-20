@@ -41,15 +41,17 @@
 
 (defn cmd-spec
   "Recursively searches spec for (sub)spec with matching (sub)command.
+   All (sub)commands recursively inherit their parents' options.
    Returns matching spec or nil when no match found."
   [spec cmd]
-  (loop [spec {:cmds [spec]}
+  (loop [spec {:cmds [spec] :opts []}
          cmd cmd]
     (if (seq cmd)
       (let [subspec (find-item (:cmds spec) (first cmd))
             subcmd (rest cmd)]
         (if subspec
-          (recur subspec subcmd)
+          (recur (update subspec :opts #(into (or % []) (:opts spec)))
+                 subcmd)
           (when (:args spec)
             spec)))
       spec)))
