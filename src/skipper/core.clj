@@ -3,7 +3,8 @@
    [clojure.string :as str]
    [clojure.java.io :as io]
    [clojure.core.match :as match]
-   [skipper.cli :as cli])
+   [skipper.cli :as cli]
+   [skipper.command :as cmd])
   (:gen-class))
 
 (defn version []
@@ -46,7 +47,7 @@
 
 (defn dispatch [args]
   (let [command (command args)]
-    (prn command)))
+    (cmd/dispatch command)))
 
 (defn -main [& args]
   (let [{:keys [options errors] :as args}
