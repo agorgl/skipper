@@ -2,6 +2,9 @@
   "resources": {
     "includes": [
       {
+        "pattern": "\\Qversion\\E"
+      },
+      {
         "pattern": "\\Qconfig.edn\\E"
       }
     ]
